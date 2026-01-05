@@ -1,0 +1,14 @@
+# Core Dependencies
+python-dotenv==1.0.0
+requests==2.31.0
+
+# Solana Integration
+solana==0.34.0
+solders==0.21.0
+base58==2.1.1
+
+# OpenAI Compatible API (OpenRouter)
+openai==1.12.0
+
+# Utilities
+python-dateutil==2.8.2
