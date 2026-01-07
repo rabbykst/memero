@@ -19,36 +19,19 @@ class Analyst:
     """
     
     def __init__(self):
-        # OpenAI Client für OpenRouter - Einfache Initialisierung
+        # OpenAI Client für OpenRouter
         if not config.OPENROUTER_API_KEY:
             raise ValueError("OPENROUTER_API_KEY nicht in .env gesetzt!")
         
         try:
-            # Minimale Client-Konfiguration für maximale Kompatibilität
-            import os
-            os.environ["OPENAI_API_KEY"] = config.OPENROUTER_API_KEY
-            
+            # Verwende die stabile OpenAI 1.3.0 API
             self.client = OpenAI(
                 api_key=config.OPENROUTER_API_KEY,
-                base_url=config.OPENROUTER_BASE_URL,
-                timeout=60.0,
-                max_retries=2
+                base_url=config.OPENROUTER_BASE_URL
             )
             logger.info("OpenAI Client erfolgreich initialisiert")
-        except TypeError as e:
-            logger.error(f"TypeError beim Initialisieren des OpenAI Clients: {e}")
-            # Fallback: Versuche ohne zusätzliche Parameter
-            try:
-                self.client = OpenAI(
-                    api_key=config.OPENROUTER_API_KEY,
-                    base_url=config.OPENROUTER_BASE_URL
-                )
-                logger.info("OpenAI Client mit Fallback-Methode initialisiert")
-            except Exception as e2:
-                logger.error(f"Auch Fallback fehlgeschlagen: {e2}")
-                raise
         except Exception as e:
-            logger.error(f"Unerwarteter Fehler beim Initialisieren des OpenAI Clients: {e}")
+            logger.error(f"Fehler beim Initialisieren des OpenAI Clients: {e}")
             raise
         
         # Empfohlenes Modell für Trading-Analyse

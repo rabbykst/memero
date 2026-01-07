@@ -7,8 +7,8 @@ solana==0.34.0
 solders==0.21.0
 base58==2.1.1
 
-# OpenAI Compatible API (OpenRouter)
-openai==1.54.0
+# OpenAI Compatible API (OpenRouter) - Stabile Version ohne proxies Bug
+openai==1.3.0
 
 # Utilities
 python-dateutil==2.8.2
