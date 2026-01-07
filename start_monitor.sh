@@ -30,6 +30,12 @@ fi
 if [ -d "venv" ]; then
     echo "🔧 Aktiviere Virtual Environment..."
     source venv/bin/activate
+elif [ -d "env" ]; then
+    echo "🔧 Aktiviere Virtual Environment..."
+    source env/bin/activate
+else
+    echo "⚠️  WARNUNG: Kein Virtual Environment gefunden!"
+    echo "   Führe zuerst ./setup.sh aus oder erstelle eins mit: python3 -m venv venv"
 fi
 
 # Dependencies prüfen
