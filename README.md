@@ -88,11 +88,49 @@ Alle Parameter können in der `.env` Datei angepasst werden:
 | `SCOUT_INTERVAL` | 300 | Scout Interval (Sekunden) |
 | `WATCHER_INTERVAL` | 3 | Watcher Check Interval (Sekunden) |
 
-## 📊 Logs
+## 📊 Logs & Monitoring
+
+### Logs
 
 Der Bot erstellt detaillierte Logs in:
 - **Console**: INFO Level
 - **bot.log**: DEBUG Level (alle Details)
+
+### 🖥️ Web-Monitoring Dashboard (Optional)
+
+MEMERO enthält ein **komplett isoliertes Web-Dashboard** für visuelles Monitoring:
+
+**Quick Start:**
+```bash
+# 1. Dependencies installieren
+pip install flask werkzeug psutil
+
+# 2. .env erweitern
+echo "MONITOR_HOST=0.0.0.0" >> .env
+echo "MONITOR_PORT=5000" >> .env
+echo "WALLET_PUBLIC_KEY=YOUR_PUBLIC_KEY" >> .env
+
+# 3. Firewall öffnen (VPS)
+sudo ufw allow 5000/tcp
+
+# 4. Starten
+./start_monitor.sh
+```
+
+**Dashboard-Features:**
+- 🔐 Login-geschützt (admin/yummyringtoneremix)
+- 📊 Echtzeit-Monitoring (Auto-Refresh 10s)
+- 💰 Wallet Balance (READ-ONLY via Solana RPC)
+- 📈 Performance Stats (PnL, Win-Rate, Charts)
+- 📋 Live Logs aus bot.log
+- 🖥️ Server Health (CPU/RAM/Disk)
+
+**Zugriff:** `http://YOUR_SERVER_IP:5000`
+
+**Vollständige Dokumentation:** [monitoring/README.md](monitoring/README.md)
+
+> ⚠️ **WICHTIG:** Das Monitoring ist 100% READ-ONLY und komplett vom Bot isoliert. Keine Trading-Funktionen, kein Wallet-Zugriff mit Schreibrechten!
+
 
 ## 🔧 Projekt-Struktur
 
