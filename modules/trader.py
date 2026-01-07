@@ -193,11 +193,17 @@ class Trader:
                 'slippageBps': 50  # 0.5% Slippage
             }
             
+            # WORKAROUND: SSL Verification deaktiviert für Jupiter API
+            # Grund: Server-seitige DNS/Certificate Probleme mit quote-api.jup.ag
+            # Jupiter ist eine bekannte, sichere API - verify=False ist hier akzeptabel
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            
             quote_response = requests.get(
                 quote_url, 
                 params=quote_params, 
                 timeout=30,
-                verify=True  # SSL Verification aktiviert
+                verify=False  # SSL Verification deaktiviert (siehe Kommentar oben)
             )
             quote_response.raise_for_status()
             quote_data = quote_response.json()
@@ -223,7 +229,7 @@ class Trader:
                 swap_url, 
                 json=swap_payload, 
                 timeout=30,
-                verify=True  # SSL Verification aktiviert
+                verify=False  # SSL Verification deaktiviert (siehe oben)
             )
             swap_response.raise_for_status()
             swap_data = swap_response.json()

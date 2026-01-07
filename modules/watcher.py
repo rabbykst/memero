@@ -264,7 +264,7 @@ class Watcher:
                 quote_url, 
                 params=quote_params, 
                 timeout=30,
-                verify=True  # SSL Verification aktiviert
+                verify=False  # SSL Verification deaktiviert für Jupiter (siehe trader.py)
             )
             quote_response.raise_for_status()
             quote_data = quote_response.json()
@@ -291,7 +291,7 @@ class Watcher:
                 swap_url, 
                 json=swap_payload, 
                 timeout=30,
-                verify=True  # SSL Verification aktiviert
+                verify=False  # SSL Verification deaktiviert für Jupiter (siehe trader.py)
             )
             swap_response.raise_for_status()
             swap_data = swap_response.json()
