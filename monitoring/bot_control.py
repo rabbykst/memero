@@ -42,9 +42,17 @@ class BotController:
                 try:
                     cmdline = ' '.join(proc.info['cmdline'] or [])
                     
-                    # Suche nach "python main.py" oder "python3 main.py"
-                    if 'main.py' in cmdline and 'memero' in cmdline.lower():
-                        return proc.info['pid']
+                    # Suche nach "python main.py" ODER prüfe ob Prozess main.py ausführt
+                    if 'main.py' in cmdline:
+                        # Zusätzlich prüfen ob es unser Bot ist (nicht irgendein anderes main.py)
+                        if str(BASE_DIR) in cmdline or 'memero' in cmdline.lower():
+                            return proc.info['pid']
+                        # Wenn kein Pfad im cmdline, prüfe working directory
+                        try:
+                            if proc.cwd() == str(BASE_DIR):
+                                return proc.info['pid']
+                        except:
+                            pass
                         
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     continue
@@ -91,11 +99,28 @@ class BotController:
             # Verwende nohup damit Bot weiterläuft wenn Monitoring beendet wird
             log_file = BASE_DIR / 'bot_output.log'
             
-            cmd = f"cd {BASE_DIR} && nohup ./start.sh > {log_file} 2>&1 &"
-            subprocess.Popen(cmd, shell=True, start_new_session=True)
+            # Direkt Python mit venv aufrufen statt start.sh
+            venv_python = BASE_DIR / 'venv' / 'bin' / 'python3'
+            
+            # Fallback auf env oder System-Python
+            if not venv_python.exists():
+                venv_python = BASE_DIR / 'env' / 'bin' / 'python3'
+            if not venv_python.exists():
+                venv_python = Path('python3')
+            
+            # Starte Bot direkt mit Python
+            with open(log_file, 'w') as log:
+                proc = subprocess.Popen(
+                    [str(venv_python), str(BOT_MAIN_FILE)],
+                    cwd=str(BASE_DIR),
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                    env=os.environ.copy()
+                )
             
             # Warte kurz und prüfe ob Prozess gestartet wurde
-            time.sleep(2)
+            time.sleep(3)
             
             if self.is_bot_running():
                 return {
@@ -104,9 +129,20 @@ class BotController:
                     'pid': self.get_bot_pid()
                 }
             else:
+                # Lese Fehler aus Log
+                error_msg = 'Bot-Start fehlgeschlagen.'
+                try:
+                    with open(log_file, 'r') as f:
+                        log_lines = f.readlines()
+                        if log_lines:
+                            # Letzte 5 Zeilen für Fehlerdiagnose
+                            error_msg += '\n\nLetzte Log-Zeilen:\n' + ''.join(log_lines[-5:])
+                except:
+                    error_msg += ' Prüfe bot_output.log'
+                
                 return {
                     'success': False,
-                    'message': 'Bot-Start fehlgeschlagen. Prüfe bot_output.log'
+                    'message': error_msg
                 }
                 
         except Exception as e:
