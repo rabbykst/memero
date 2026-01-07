@@ -37,6 +37,7 @@ function loadAllData() {
     loadStats();
     loadTrades();
     loadLogs();
+    loadBotStatus();  // NEU: Bot-Status laden
 }
 
 async function loadStatus() {
@@ -260,10 +261,14 @@ function initCharts() {
     winlossChart = new Chart(wlCtx, {
         type: 'doughnut',
         data: {
-            labels: ['Gewinn', 'Verlust'],
+            labels: ['Gewinn', 'Verlust', 'Trade Failed'],
             datasets: [{
-                data: [65, 35],
-                backgroundColor: ['#10b981', '#ef4444'],
+                data: [0, 0, 0],  // Wird von updateCharts() aktualisiert
+                backgroundColor: [
+                    '#10b981',  // Grün für Gewinn
+                    '#ef4444',  // Rot für Verlust
+                    '#6b7280'   // Grau für Failed
+                ],
                 borderWidth: 0
             }]
         },
@@ -280,10 +285,11 @@ function initCharts() {
 }
 
 function updateCharts(stats) {
-    // Update Win/Loss Chart
+    // Update Win/Loss/Failed Chart
     if (winlossChart && stats.successful_trades !== undefined) {
         winlossChart.data.datasets[0].data = [
             stats.successful_trades || 0,
+            stats.loss_trades || 0,
             stats.failed_trades || 0
         ];
         winlossChart.update();
@@ -310,5 +316,141 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+// ============================================================================
+// BOT CONTROL
+// ============================================================================
+
+let currentBotAction = null;
+
+async function loadBotStatus() {
+    try {
+        const response = await fetch('/api/bot/status');
+        const data = await response.json();
+        
+        const dot = document.getElementById('bot-control-dot');
+        const status = document.getElementById('bot-control-status');
+        const startBtn = document.getElementById('btn-start-bot');
+        const stopBtn = document.getElementById('btn-stop-bot');
+        
+        if (data.is_running) {
+            dot.textContent = '🟢';
+            status.textContent = `Status: Läuft (PID: ${data.pid})`;
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+        } else {
+            dot.textContent = '🔴';
+            status.textContent = 'Status: Gestoppt';
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+        }
+        
+        // Timer Status
+        const timerStatus = document.getElementById('timer-status');
+        if (data.timer && data.timer.timer_active) {
+            timerStatus.textContent = `⏰ Timer aktiv: ${data.timer.remaining_minutes} Min verbleibend`;
+            timerStatus.style.color = '#f59e0b';
+        } else {
+            timerStatus.textContent = 'Kein Timer aktiv';
+            timerStatus.style.color = 'var(--text-muted)';
+        }
+        
+        // Auto-Stopped Notification
+        if (data.timer && data.timer.auto_stopped) {
+            alert('⏰ Timer abgelaufen - Bot wurde automatisch gestoppt!');
+        }
+        
+    } catch (error) {
+        console.error('Fehler beim Laden des Bot-Status:', error);
+    }
+}
+
+function showBotControlModal(action) {
+    currentBotAction = action;
+    const modal = document.getElementById('bot-control-modal');
+    const title = document.getElementById('modal-title');
+    const desc = document.getElementById('modal-description');
+    const passwordInput = document.getElementById('bot-control-password');
+    
+    passwordInput.value = '';
+    document.getElementById('modal-error').textContent = '';
+    
+    if (action === 'start') {
+        title.textContent = '▶️ Bot starten';
+        desc.textContent = 'Bitte gib das Bot-Control-Passwort ein um den Bot zu starten:';
+    } else if (action === 'stop') {
+        title.textContent = '⏹️ Bot stoppen';
+        desc.textContent = 'Bitte gib das Bot-Control-Passwort ein um den Bot zu stoppen:';
+    } else if (action === 'timer') {
+        title.textContent = '⏰ Timer setzen';
+        desc.textContent = 'Bitte gib das Bot-Control-Passwort ein um den Timer zu setzen:';
+    }
+    
+    modal.style.display = 'flex';
+    passwordInput.focus();
+}
+
+function closeBotControlModal() {
+    document.getElementById('bot-control-modal').style.display = 'none';
+    currentBotAction = null;
+}
+
+async function executeBotControl() {
+    const password = document.getElementById('bot-control-password').value;
+    const errorEl = document.getElementById('modal-error');
+    const confirmBtn = document.getElementById('modal-confirm');
+    
+    if (!password) {
+        errorEl.textContent = 'Bitte Passwort eingeben!';
+        return;
+    }
+    
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Wird ausgeführt...';
+    
+    try {
+        let endpoint = '';
+        let body = { password };
+        
+        if (currentBotAction === 'start') {
+            endpoint = '/api/bot/start';
+        } else if (currentBotAction === 'stop') {
+            endpoint = '/api/bot/stop';
+        } else if (currentBotAction === 'timer') {
+            const minutes = parseInt(document.getElementById('timer-select').value);
+            endpoint = '/api/bot/timer';
+            body.minutes = minutes;
+        }
+        
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('✅ ' + data.message);
+            closeBotControlModal();
+            loadBotStatus();  // Aktualisiere Status
+        } else {
+            errorEl.textContent = '❌ ' + data.message;
+        }
+        
+    } catch (error) {
+        errorEl.textContent = '❌ Fehler: ' + error.message;
+    } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Bestätigen';
+    }
+}
+
+// Enter-Taste im Modal
+document.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter' && document.getElementById('bot-control-modal').style.display === 'flex') {
+        executeBotControl();
+    }
+});
 
 console.log('MEMERO Dashboard JavaScript geladen ✓');

@@ -19,9 +19,11 @@ from monitoring.config import (
     SECRET_KEY,
     ADMIN_USERNAME,
     ADMIN_PASSWORD,
+    BOT_CONTROL_PASSWORD,
     DEBUG
 )
 from monitoring.data_reader import data_reader
+from monitoring.bot_control import bot_controller
 
 
 # ============================================================================
@@ -170,6 +172,85 @@ def api_stats():
     stats = data_reader.get_statistics()
     
     return jsonify(stats)
+
+
+# ============================================================================
+# API ENDPOINTS: BOT CONTROL (2-stufige Auth!)
+# ============================================================================
+
+@app.route('/api/bot/status')
+@login_required
+def api_bot_status():
+    """
+    Bot-Status (läuft/gestoppt, PID, Timer)
+    """
+    is_running = bot_controller.is_bot_running()
+    pid = bot_controller.get_bot_pid()
+    timer_status = bot_controller.check_timer()
+    
+    return jsonify({
+        'is_running': is_running,
+        'pid': pid,
+        'timer': timer_status
+    })
+
+
+@app.route('/api/bot/start', methods=['POST'])
+@login_required
+def api_bot_start():
+    """
+    Bot starten (erfordert BOT_CONTROL_PASSWORD)
+    """
+    # Zweite Sicherheitsebene: Bot-Control-Passwort
+    password = request.json.get('password', '')
+    
+    if password != BOT_CONTROL_PASSWORD:
+        return jsonify({
+            'success': False,
+            'message': 'Ungültiges Bot-Control-Passwort!'
+        }), 403
+    
+    result = bot_controller.start_bot()
+    return jsonify(result)
+
+
+@app.route('/api/bot/stop', methods=['POST'])
+@login_required
+def api_bot_stop():
+    """
+    Bot stoppen (erfordert BOT_CONTROL_PASSWORD)
+    """
+    # Zweite Sicherheitsebene: Bot-Control-Passwort
+    password = request.json.get('password', '')
+    
+    if password != BOT_CONTROL_PASSWORD:
+        return jsonify({
+            'success': False,
+            'message': 'Ungültiges Bot-Control-Passwort!'
+        }), 403
+    
+    result = bot_controller.stop_bot()
+    return jsonify(result)
+
+
+@app.route('/api/bot/timer', methods=['POST'])
+@login_required
+def api_bot_timer():
+    """
+    Sleep-Timer setzen (erfordert BOT_CONTROL_PASSWORD)
+    """
+    # Zweite Sicherheitsebene: Bot-Control-Passwort
+    password = request.json.get('password', '')
+    minutes = request.json.get('minutes', 0)
+    
+    if password != BOT_CONTROL_PASSWORD:
+        return jsonify({
+            'success': False,
+            'message': 'Ungültiges Bot-Control-Passwort!'
+        }), 403
+    
+    result = bot_controller.set_timer(minutes)
+    return jsonify(result)
 
 
 # ============================================================================

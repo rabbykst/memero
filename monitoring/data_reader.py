@@ -236,6 +236,9 @@ class DataReader:
             if not trades or 'error' in trades[0]:
                 return {
                     'total_trades': 0,
+                    'successful_trades': 0,
+                    'failed_trades': 0,
+                    'loss_trades': 0,
                     'win_rate': 0,
                     'total_pnl': 0,
                     'avg_profit': 0,
@@ -244,35 +247,54 @@ class DataReader:
                     'today_pnl': 0
                 }
             
-            # Filtere erfolgreiche Trades
-            successful_trades = [t for t in trades if t.get('status') == 'success']
-            failed_trades = [t for t in trades if t.get('status') == 'failed']
+            # Kategorisiere Trades
+            successful_trades = []  # Gewinn
+            loss_trades = []        # Verlust
+            failed_trades = []      # Technisch fehlgeschlagen
             
-            total_trades = len(successful_trades) + len(failed_trades)
-            win_rate = (len(successful_trades) / total_trades * 100) if total_trades > 0 else 0
+            for t in trades:
+                if t.get('status') == 'failed':
+                    failed_trades.append(t)
+                elif t.get('status') == 'success':
+                    # Hier müsste man PnL aus Trade-Details lesen
+                    # Für jetzt: success = Gewinn angenommen
+                    successful_trades.append(t)
+                elif t.get('status') == 'loss':
+                    loss_trades.append(t)
             
-            # Placeholder PnL (würde in Produktion aus Trade-Details berechnet)
-            total_pnl = len(successful_trades) * 0.005  # Mock: 0.005 SOL pro erfolgreichen Trade
-            avg_profit = total_pnl / total_trades if total_trades > 0 else 0
+            total_trades = len(successful_trades) + len(loss_trades) + len(failed_trades)
+            
+            # Win-Rate: nur erfolgreiche Trades vs. erfolgreiche + Verlust (failed nicht mitgezählt)
+            tradeable = len(successful_trades) + len(loss_trades)
+            win_rate = (len(successful_trades) / tradeable * 100) if tradeable > 0 else 0
+            
+            # Placeholder PnL (echte Werte müssten aus Trade-Details kommen)
+            total_pnl = len(successful_trades) * 0.005 - len(loss_trades) * 0.003
+            avg_profit = total_pnl / tradeable if tradeable > 0 else 0
             
             # Heutige Trades
             today = datetime.now(self.timezone).date()
-            today_trades = [
+            today_successful = [
                 t for t in successful_trades 
                 if t.get('timestamp', '').startswith(str(today))
             ]
-            today_pnl = len(today_trades) * 0.005
+            today_loss = [
+                t for t in loss_trades
+                if t.get('timestamp', '').startswith(str(today))
+            ]
+            today_pnl = len(today_successful) * 0.005 - len(today_loss) * 0.003
             
             return {
                 'total_trades': total_trades,
                 'successful_trades': len(successful_trades),
+                'loss_trades': len(loss_trades),
                 'failed_trades': len(failed_trades),
                 'win_rate': round(win_rate, 2),
                 'total_pnl': round(total_pnl, 6),
                 'avg_profit': round(avg_profit, 6),
                 'today_pnl': round(today_pnl, 6),
-                'best_trade': 0.015,  # Placeholder
-                'worst_trade': -0.008  # Placeholder
+                'best_trade': 0.015,  # TODO: Aus echten Daten
+                'worst_trade': -0.008  # TODO: Aus echten Daten
             }
             
         except Exception as e:

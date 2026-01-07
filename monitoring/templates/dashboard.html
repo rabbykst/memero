@@ -25,6 +25,44 @@
     <!-- Main Content -->
     <main class="main-content">
         
+        <!-- Bot Control Section -->
+        <div class="bot-control-section">
+            <div class="control-card">
+                <h2>🤖 Bot Steuerung</h2>
+                <div class="control-content">
+                    <div class="bot-status-display">
+                        <span class="status-dot" id="bot-control-dot">⚫</span>
+                        <span id="bot-control-status">Status: Prüfe...</span>
+                    </div>
+                    
+                    <div class="control-buttons">
+                        <button class="btn-control btn-start" id="btn-start-bot" onclick="showBotControlModal('start')">
+                            ▶️ Bot starten
+                        </button>
+                        <button class="btn-control btn-stop" id="btn-stop-bot" onclick="showBotControlModal('stop')">
+                            ⏹️ Bot stoppen
+                        </button>
+                    </div>
+                    
+                    <div class="timer-section">
+                        <h3>⏰ Sleep-Timer</h3>
+                        <div class="timer-controls">
+                            <select id="timer-select" class="timer-select">
+                                <option value="0">Kein Timer</option>
+                                <option value="15">15 Minuten</option>
+                                <option value="30">30 Minuten</option>
+                                <option value="60">1 Stunde</option>
+                                <option value="120">2 Stunden</option>
+                                <option value="240">4 Stunden</option>
+                            </select>
+                            <button class="btn-control btn-timer" onclick="showBotControlModal('timer')">Timer setzen</button>
+                        </div>
+                        <div class="timer-status" id="timer-status">Kein Timer aktiv</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Status Cards -->
         <div class="status-grid">
             <div class="status-card" id="bot-status">
@@ -147,6 +185,21 @@
         </div>
 
     </main>
+
+    <!-- Bot Control Password Modal -->
+    <div id="bot-control-modal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeBotControlModal()">&times;</span>
+            <h2 id="modal-title">Bot-Steuerung</h2>
+            <p id="modal-description">Bitte gib das Bot-Control-Passwort ein:</p>
+            <input type="password" id="bot-control-password" class="modal-input" placeholder="Passwort" autofocus>
+            <div class="modal-buttons">
+                <button class="btn-modal btn-confirm" id="modal-confirm" onclick="executeBotControl()">Bestätigen</button>
+                <button class="btn-modal btn-cancel" onclick="closeBotControlModal()">Abbrechen</button>
+            </div>
+            <div id="modal-error" class="modal-error"></div>
+        </div>
+    </div>
 
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 </body>
