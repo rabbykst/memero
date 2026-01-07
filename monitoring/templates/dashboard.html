@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MEMERO Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <h1>MEMERO</h1>
+                <span class="subtitle">Trading Bot Monitoring</span>
+            </div>
+            <div class="header-actions">
+                <span class="user">👤 {{ session.username }}</span>
+                <a href="/logout" class="btn-logout">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        
+        <!-- Status Cards -->
+        <div class="status-grid">
+            <div class="status-card" id="bot-status">
+                <div class="card-header">
+                    <h3>Bot Status</h3>
+                    <span class="status-indicator" id="bot-indicator">⚫</span>
+                </div>
+                <div class="card-body">
+                    <div class="status-value" id="bot-running">Prüfe...</div>
+                    <div class="status-detail" id="bot-last-activity">Letzte Aktivität: N/A</div>
+                </div>
+            </div>
+
+            <div class="status-card" id="server-status">
+                <div class="card-header">
+                    <h3>Server Health</h3>
+                    <span class="status-indicator" id="server-indicator">⚫</span>
+                </div>
+                <div class="card-body">
+                    <div class="health-metrics">
+                        <div class="metric">
+                            <span class="metric-label">CPU</span>
+                            <span class="metric-value" id="cpu-usage">0%</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">RAM</span>
+                            <span class="metric-value" id="ram-usage">0%</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Disk</span>
+                            <span class="metric-value" id="disk-usage">0%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-card" id="wallet-status">
+                <div class="card-header">
+                    <h3>Wallet Balance</h3>
+                    <span class="status-indicator">💰</span>
+                </div>
+                <div class="card-body">
+                    <div class="wallet-balance">
+                        <div class="balance-sol" id="balance-sol">0.000000 SOL</div>
+                        <div class="balance-usd" id="balance-usd">$0.00</div>
+                    </div>
+                    <div class="wallet-address" id="wallet-address">N/A</div>
+                </div>
+            </div>
+
+            <div class="status-card" id="pnl-status">
+                <div class="card-header">
+                    <h3>Performance</h3>
+                    <span class="status-indicator">📈</span>
+                </div>
+                <div class="card-body">
+                    <div class="pnl-metrics">
+                        <div class="pnl-item">
+                            <span class="pnl-label">Heute</span>
+                            <span class="pnl-value positive" id="today-pnl">+0.00 SOL</span>
+                        </div>
+                        <div class="pnl-item">
+                            <span class="pnl-label">Gesamt</span>
+                            <span class="pnl-value" id="total-pnl">0.00 SOL</span>
+                        </div>
+                        <div class="pnl-item">
+                            <span class="pnl-label">Win-Rate</span>
+                            <span class="pnl-value" id="win-rate">0%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="charts-row">
+            <div class="chart-container">
+                <h3>Performance Übersicht</h3>
+                <canvas id="performance-chart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3>Win/Loss Verteilung</h3>
+                <canvas id="winloss-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- Trades Table -->
+        <div class="section">
+            <div class="section-header">
+                <h2>Letzte Trades</h2>
+                <button class="btn-refresh" onclick="loadTrades()">🔄 Aktualisieren</button>
+            </div>
+            <div class="table-container">
+                <table class="trades-table">
+                    <thead>
+                        <tr>
+                            <th>Zeit</th>
+                            <th>Token</th>
+                            <th>Adresse</th>
+                            <th>Typ</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trades-tbody">
+                        <tr><td colspan="5" class="loading">Lade Trades...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Logs Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>Bot Logs</h2>
+                <button class="btn-refresh" onclick="loadLogs()">🔄 Aktualisieren</button>
+            </div>
+            <div class="logs-container" id="logs-container">
+                <div class="loading">Lade Logs...</div>
+            </div>
+        </div>
+
+    </main>
+
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>
