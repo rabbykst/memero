@@ -2,6 +2,7 @@
 python-dotenv==1.0.0
 requests==2.31.0
 pytz==2024.1
+certifi==2024.12.14
 
 # Solana Integration
 solana==0.34.0

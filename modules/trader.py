@@ -193,7 +193,12 @@ class Trader:
                 'slippageBps': 50  # 0.5% Slippage
             }
             
-            quote_response = requests.get(quote_url, params=quote_params, timeout=30)
+            quote_response = requests.get(
+                quote_url, 
+                params=quote_params, 
+                timeout=30,
+                verify=True  # SSL Verification aktiviert
+            )
             quote_response.raise_for_status()
             quote_data = quote_response.json()
             
@@ -214,7 +219,12 @@ class Trader:
                 'prioritizationFeeLamports': 'auto'
             }
             
-            swap_response = requests.post(swap_url, json=swap_payload, timeout=30)
+            swap_response = requests.post(
+                swap_url, 
+                json=swap_payload, 
+                timeout=30,
+                verify=True  # SSL Verification aktiviert
+            )
             swap_response.raise_for_status()
             swap_data = swap_response.json()
             
