@@ -49,6 +49,42 @@ body {
     align-items: center;
 }
 
+.header-center {
+    display: flex;
+    gap: 40px;
+    align-items: center;
+}
+
+.clock-container,
+.countdown-container {
+    text-align: center;
+}
+
+.clock,
+.countdown {
+    font-size: 28px;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+    color: var(--text-primary);
+    margin-bottom: 5px;
+}
+
+.clock {
+    color: #10b981;
+}
+
+.countdown {
+    color: #f59e0b;
+}
+
+.clock-label,
+.countdown-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
 .logo h1 {
     font-size: 32px;
     background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);

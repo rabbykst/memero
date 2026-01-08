@@ -10,6 +10,11 @@ let winlossChart = null;
 // Auto-Refresh Interval (10 Sekunden)
 const REFRESH_INTERVAL = 10000;
 
+// Trade Interval (300 Sekunden = 5 Minuten)
+const TRADE_INTERVAL = 300;
+let lastTradeTime = null;
+let countdownInterval = null;
+
 // ============================================================================
 // INITIALIZATION
 // ============================================================================
@@ -22,6 +27,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Charts initialisieren
     initCharts();
+    
+    // Uhr starten
+    startLiveClock();
+    
+    // Countdown starten
+    startTradeCountdown();
     
     // Auto-Refresh starten
     setInterval(loadAllData, REFRESH_INTERVAL);
@@ -62,6 +73,9 @@ async function loadStatus() {
         }
         
         botActivity.textContent = `Letzte Aktivität: ${botStatus.last_activity || 'N/A'}`;
+        
+        // Update Countdown mit Bot-Status
+        updateCountdownFromBotStatus(botStatus);
         
         // Server Health
         const serverStatus = data.server;
@@ -452,5 +466,91 @@ document.addEventListener('keypress', function(e) {
         executeBotControl();
     }
 });
+
+// ============================================================================
+// LIVE CLOCK & COUNTDOWN
+// ============================================================================
+
+function startLiveClock() {
+    function updateClock() {
+        const now = new Date();
+        
+        // MEZ (UTC+1) bzw. MESZ (UTC+2)
+        const options = {
+            timeZone: 'Europe/Berlin',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        };
+        
+        const timeString = now.toLocaleTimeString('de-DE', options);
+        document.getElementById('live-clock').textContent = timeString;
+    }
+    
+    updateClock();
+    setInterval(updateClock, 1000);
+}
+
+function startTradeCountdown() {
+    // Countdown alle Sekunde aktualisieren
+    countdownInterval = setInterval(updateCountdown, 1000);
+    updateCountdown();
+}
+
+function updateCountdown() {
+    // Hole letzten Trade-Zeitstempel vom Bot Status
+    if (!lastTradeTime) {
+        // Fallback: Countdown von TRADE_INTERVAL starten
+        const now = Math.floor(Date.now() / 1000);
+        const elapsed = now % TRADE_INTERVAL;
+        const remaining = TRADE_INTERVAL - elapsed;
+        displayCountdown(remaining);
+        return;
+    }
+    
+    const now = Math.floor(Date.now() / 1000);
+    const elapsed = now - lastTradeTime;
+    const remaining = Math.max(0, TRADE_INTERVAL - elapsed);
+    
+    displayCountdown(remaining);
+    
+    // Wenn Countdown abgelaufen, auf nächsten Zyklus warten
+    if (remaining === 0) {
+        lastTradeTime = now;
+    }
+}
+
+function displayCountdown(seconds) {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    const timeString = `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    
+    const countdownEl = document.getElementById('trade-countdown');
+    countdownEl.textContent = timeString;
+    
+    // Farbwechsel bei wenig Zeit
+    if (seconds < 30) {
+        countdownEl.style.color = '#ef4444';  // Rot
+    } else if (seconds < 60) {
+        countdownEl.style.color = '#f59e0b';  // Orange
+    } else {
+        countdownEl.style.color = '#f59e0b';  // Standard Orange
+    }
+}
+
+// Countdown-Zeit aus Bot-Status aktualisieren
+function updateCountdownFromBotStatus(botStatus) {
+    if (botStatus && botStatus.last_activity) {
+        // Parse last_activity timestamp wenn verfügbar
+        // Format: "2026-01-08 18:17:25" (MEZ)
+        try {
+            const activityTime = new Date(botStatus.last_activity.replace(' MEZ', ''));
+            lastTradeTime = Math.floor(activityTime.getTime() / 1000);
+        } catch (e) {
+            console.warn('Could not parse last_activity:', e);
+        }
+    }
+}
 
 console.log('MEMERO Dashboard JavaScript geladen ✓');

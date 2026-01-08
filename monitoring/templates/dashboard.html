@@ -15,6 +15,16 @@
                 <h1>MEMERO</h1>
                 <span class="subtitle">Trading Bot Monitoring</span>
             </div>
+            <div class="header-center">
+                <div class="clock-container">
+                    <div class="clock" id="live-clock">00:00:00</div>
+                    <div class="clock-label">Aktuelle Zeit (MEZ)</div>
+                </div>
+                <div class="countdown-container">
+                    <div class="countdown" id="trade-countdown">--:--</div>
+                    <div class="countdown-label">Nächster Trade Scan</div>
+                </div>
+            </div>
             <div class="header-actions">
                 <span class="user">👤 {{ session.username }}</span>
                 <a href="/logout" class="btn-logout">Logout</a>
