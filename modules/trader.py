@@ -288,12 +288,14 @@ class Trader:
             transaction_bytes = base64.b64decode(swap_transaction_b64)
             transaction = VersionedTransaction.from_bytes(transaction_bytes)
             
-            # Signiere Transaction
-            transaction.sign([self.wallet])
+            # Signiere VersionedTransaction korrekt
+            # VersionedTransaction hat keine .sign() Methode - wir müssen populate() verwenden
+            keypair = Keypair.from_bytes(self.wallet.secret_key)
+            signed_tx = VersionedTransaction.populate(transaction.message, [keypair])
             
             # Sende Transaction
             logger.info(f"Sende Swap Transaction für {symbol}...")
-            tx_response = self.rpc_client.send_transaction(transaction)
+            tx_response = self.rpc_client.send_transaction(signed_tx)
             
             signature = str(tx_response.value)
             logger.info(f"Transaction gesendet: {signature}")
