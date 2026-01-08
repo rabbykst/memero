@@ -285,12 +285,18 @@ class Trader:
             
             # Decode Transaction
             import base64
+            from solders.signature import Signature
+            
             transaction_bytes = base64.b64decode(swap_transaction_b64)
             transaction = VersionedTransaction.from_bytes(transaction_bytes)
             
-            # Signiere VersionedTransaction korrekt
-            # self.wallet ist bereits ein Keypair Objekt - direkt verwenden
-            signed_tx = VersionedTransaction.populate(transaction.message, [self.wallet])
+            # Signiere die Transaction Message mit dem Wallet
+            # VersionedTransaction benötigt Signature Objekte, nicht Keypairs
+            message_bytes = bytes(transaction.message)
+            signature = self.wallet.sign_message(message_bytes)
+            
+            # Erstelle signierte Transaction mit der Signature
+            signed_tx = VersionedTransaction.populate(transaction.message, [signature])
             
             # Sende Transaction
             logger.info(f"Sende Swap Transaction für {symbol}...")
