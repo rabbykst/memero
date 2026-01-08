@@ -79,12 +79,13 @@ Wants=network-online.target
 Type=simple
 User=root
 Group=root
-WorkingDirectory=$SCRIPT_DIR
+WorkingDirectory=$BASE_DIR
 Environment="PATH=$BASE_DIR/venv/bin:$BASE_DIR/env/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=$BASE_DIR"
 Environment="PYTHONUNBUFFERED=1"
 
-# Haupt-Befehl
-ExecStart=$PYTHON_BIN $SCRIPT_DIR/monitor.py
+# Haupt-Befehl - WICHTIG: Mit -m als Modul starten!
+ExecStart=$PYTHON_BIN -m monitoring.monitor
 
 # Automatischer Neustart bei Absturz
 Restart=always
