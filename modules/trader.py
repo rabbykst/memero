@@ -12,6 +12,7 @@ from solders.pubkey import Pubkey
 from solders.keypair import Keypair
 from solders.transaction import VersionedTransaction
 from solders.message import MessageV0
+from solders.signature import Signature
 import config
 
 logger = logging.getLogger(__name__)
@@ -297,7 +298,8 @@ class Trader:
             logger.info(f"Sende Swap Transaction für {symbol}...")
             tx_response = self.rpc_client.send_transaction(signed_tx)
             
-            signature = str(tx_response.value)
+            # tx_response.value ist bereits ein Signature Objekt
+            signature = tx_response.value
             logger.info(f"Transaction gesendet: {signature}")
             
             # Warte auf Confirmation
@@ -308,7 +310,7 @@ class Trader:
                 logger.info(f"✅ Transaction bestätigt: {signature}")
                 
                 return {
-                    'signature': signature,
+                    'signature': str(signature),
                     'token_address': token_address,
                     'symbol': symbol,
                     'amount_sol': self.trade_amount_sol,
