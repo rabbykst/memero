@@ -14,6 +14,7 @@ from solders.transaction import VersionedTransaction
 from solders.message import MessageV0
 from solders.signature import Signature
 import config
+from modules.trade_manager import trade_manager
 
 logger = logging.getLogger(__name__)
 
@@ -62,19 +63,73 @@ class Trader:
         # CRITICAL SECURITY CHECKS
         if not self._perform_security_checks(contract_address):
             logger.error(f"SECURITY CHECK FAILED für {symbol} - TRADE ABGEBROCHEN!")
+            
+            # Speichere fehlgeschlagenen Trade
+            trade_manager.save_trade({
+                'type': 'BUY',
+                'status': 'FAILED',
+                'token_address': contract_address,
+                'symbol': symbol,
+                'error_message': 'Security Check Failed',
+                'confidence': pair.get('confidence'),
+                'risk_score': pair.get('risk_score'),
+                'reasoning': pair.get('reasoning')
+            })
+            
             return None
         
         logger.info(f"✓ Security Checks bestanden für {symbol}")
         
         # Führe Swap via Jupiter aus
-        trade_result = self._execute_jupiter_swap(contract_address, symbol)
+        trade_result = self._execute_jupiter_swap(contract_address, symbol, pair)
         
         if trade_result:
             logger.info(f"=== TRADE ERFOLGREICH: {symbol} ===")
             trade_result['pair'] = pair
+            
+            # Speichere erfolgreichen Trade
+            trade_manager.save_trade({
+                'type': 'BUY',
+                'status': 'SUCCESS',
+                'token_address': contract_address,
+                'symbol': symbol,
+                'signature': trade_result.get('signature'),
+                'amount_sol': trade_result.get('amount_sol'),
+                'amount_tokens': trade_result.get('amount_tokens'),
+                'entry_price': trade_result.get('entry_price'),
+                'confidence': pair.get('confidence'),
+                'risk_score': pair.get('risk_score'),
+                'reasoning': pair.get('reasoning')
+            })
+            
+            # Füge offene Position hinzu
+            trade_manager.add_position({
+                'token_address': contract_address,
+                'symbol': symbol,
+                'entry_price': trade_result.get('entry_price'),
+                'amount_sol': trade_result.get('amount_sol'),
+                'amount_tokens': trade_result.get('amount_tokens'),
+                'signature': trade_result.get('signature'),
+                'confidence': pair.get('confidence'),
+                'risk_score': pair.get('risk_score')
+            })
+            
             return trade_result
         else:
             logger.error(f"=== TRADE FEHLGESCHLAGEN: {symbol} ===")
+            
+            # Speichere fehlgeschlagenen Trade
+            trade_manager.save_trade({
+                'type': 'BUY',
+                'status': 'FAILED',
+                'token_address': contract_address,
+                'symbol': symbol,
+                'error_message': 'Jupiter Swap Failed',
+                'confidence': pair.get('confidence'),
+                'risk_score': pair.get('risk_score'),
+                'reasoning': pair.get('reasoning')
+            })
+            
             return None
     
     def _perform_security_checks(self, token_address: str) -> bool:
@@ -165,7 +220,7 @@ class Trader:
             logger.error(f"Fehler bei Security Checks: {e}", exc_info=True)
             return False
     
-    def _execute_jupiter_swap(self, token_address: str, symbol: str) -> Optional[Dict]:
+    def _execute_jupiter_swap(self, token_address: str, symbol: str, pair: Dict = None) -> Optional[Dict]:
         """
         Führt einen Swap über Jupiter Aggregator aus
         
@@ -317,12 +372,16 @@ class Trader:
             if confirmation.value:
                 logger.info(f"✅ Transaction bestätigt: {signature}")
                 
+                # Berechne Entry Price
+                entry_price = self.trade_amount_sol / out_amount if out_amount > 0 else 0
+                
                 return {
                     'signature': str(signature),
                     'token_address': token_address,
                     'symbol': symbol,
                     'amount_sol': self.trade_amount_sol,
                     'amount_tokens': out_amount,
+                    'entry_price': entry_price,
                     'success': True
                 }
             else:
