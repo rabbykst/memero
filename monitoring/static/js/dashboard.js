@@ -47,6 +47,7 @@ function loadAllData() {
     loadWallet();
     loadStats();
     loadTrades();
+    loadPositions();  // NEU: Positionen laden
     loadLogs();
     loadBotStatus();  // NEU: Bot-Status laden
 }
@@ -194,6 +195,68 @@ async function loadTrades() {
     }
 }
 
+async function loadPositions() {
+    try {
+        const response = await fetch('/api/positions');
+        const data = await response.json();
+        
+        const container = document.getElementById('positions-container');
+        
+        if (!container) {
+            // Container noch nicht im HTML, erstmal überspringen
+            return;
+        }
+        
+        if (data.positions.length === 0) {
+            container.innerHTML = '<div class="no-positions">Keine offenen Positionen</div>';
+            return;
+        }
+        
+        container.innerHTML = '';
+        
+        data.positions.forEach(pos => {
+            const card = document.createElement('div');
+            card.className = 'position-card';
+            
+            const pnlClass = pos.pnl_percent >= 0 ? 'positive' : 'negative';
+            const pnlSign = pos.pnl_percent >= 0 ? '+' : '';
+            
+            card.innerHTML = `
+                <div class="position-header">
+                    <h4>${pos.symbol}</h4>
+                    <span class="pnl-badge ${pnlClass}">${pnlSign}${pos.pnl_percent.toFixed(2)}%</span>
+                </div>
+                <div class="position-details">
+                    <div class="position-row">
+                        <span class="label">Entry:</span>
+                        <span class="value">${pos.entry_price.toFixed(6)} SOL</span>
+                    </div>
+                    <div class="position-row">
+                        <span class="label">Current:</span>
+                        <span class="value">${pos.current_price.toFixed(6)} SOL</span>
+                    </div>
+                    <div class="position-row">
+                        <span class="label">Amount:</span>
+                        <span class="value">${pos.amount_tokens.toFixed(2)} Tokens</span>
+                    </div>
+                    <div class="position-row">
+                        <span class="label">CA:</span>
+                        <span class="value ca-text" title="${pos.token_address}">
+                            ${pos.token_address.substring(0, 8)}...
+                            <button class="copy-btn" onclick="copyToClipboard('${pos.token_address}')">📋</button>
+                        </span>
+                    </div>
+                </div>
+            `;
+            
+            container.appendChild(card);
+        });
+        
+    } catch (error) {
+        console.error('Fehler beim Laden der Positionen:', error);
+    }
+}
+
 async function loadLogs() {
     try {
         const response = await fetch('/api/logs?lines=100');
@@ -299,12 +362,13 @@ function initCharts() {
 }
 
 function updateCharts(stats) {
-    // Update Win/Loss/Failed Chart
-    if (winlossChart && stats.successful_trades !== undefined) {
+    // Update Win/Loss/Failed Chart mit echten Daten
+    if (winlossChart) {
+        // Nutze wins/losses/failed_trades aus echten Trade-Daten
         winlossChart.data.datasets[0].data = [
-            stats.successful_trades || 0,
-            stats.loss_trades || 0,
-            stats.failed_trades || 0
+            stats.wins || 0,           // Gewinn-Trades
+            stats.loss_trades || 0,     // Verlust-Trades
+            stats.failed_trades || 0    // Technisch fehlgeschlagen
         ];
         winlossChart.update();
     }
@@ -331,6 +395,21 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        // Visuelles Feedback
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = '✅';
+        setTimeout(() => {
+            btn.textContent = originalText;
+        }, 2000);
+    }).catch(err => {
+        console.error('Fehler beim Kopieren:', err);
+        alert('Fehler beim Kopieren in Zwischenablage');
+    });
+}
+
 // ============================================================================
 // BOT CONTROL
 // ============================================================================
@@ -349,7 +428,20 @@ async function loadBotStatus() {
         
         if (data.is_running) {
             dot.textContent = '🟢';
-            status.textContent = `Status: Läuft (PID: ${data.pid})`;
+            
+            // Erweiterte Status-Info mit Uptime und Memory
+            let statusText = `Status: Läuft (PID: ${data.pid})`;
+            if (data.uptime_formatted) {
+                statusText += ` | Uptime: ${data.uptime_formatted}`;
+            }
+            if (data.memory_mb) {
+                statusText += ` | RAM: ${data.memory_mb} MB`;
+            }
+            if (data.last_activity) {
+                statusText += ` | Letzter Scan: ${data.last_activity}`;
+            }
+            
+            status.textContent = statusText;
             startBtn.disabled = true;
             stopBtn.disabled = false;
         } else {
@@ -542,11 +634,17 @@ function displayCountdown(seconds) {
 // Countdown-Zeit aus Bot-Status aktualisieren
 function updateCountdownFromBotStatus(botStatus) {
     if (botStatus && botStatus.last_activity) {
-        // Parse last_activity timestamp wenn verfügbar
-        // Format: "2026-01-08 18:17:25" (MEZ)
+        // Parse last_activity timestamp von get_bot_status()
+        // Format: "2024-01-15 14:30:45"
         try {
-            const activityTime = new Date(botStatus.last_activity.replace(' MEZ', ''));
-            lastTradeTime = Math.floor(activityTime.getTime() / 1000);
+            // Entferne mögliche Timezone-Suffixe
+            const cleanTimestamp = botStatus.last_activity.replace(' MEZ', '').replace(' CET', '').replace(' CEST', '');
+            const activityTime = new Date(cleanTimestamp);
+            
+            if (!isNaN(activityTime.getTime())) {
+                lastTradeTime = Math.floor(activityTime.getTime() / 1000);
+                console.log('Countdown synchronized with last_activity:', cleanTimestamp);
+            }
         } catch (e) {
             console.warn('Could not parse last_activity:', e);
         }

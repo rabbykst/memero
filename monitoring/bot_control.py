@@ -9,6 +9,7 @@ import subprocess
 import psutil
 import signal
 import os
+import re
 from typing import Dict, Optional
 from pathlib import Path
 import time
@@ -229,6 +230,111 @@ class BotController:
                 'success': False,
                 'message': f'Fehler beim Timer setzen: {str(e)}'
             }
+    
+    def get_bot_status(self) -> Dict:
+        """
+        Erweiterte Bot-Status-Info mit Uptime und Live-Metriken
+        
+        Returns:
+            Dict mit running, pid, uptime, last_activity, memory_mb
+        """
+        try:
+            pid = self.get_bot_pid()
+            
+            if not pid:
+                return {
+                    'running': False,
+                    'pid': None,
+                    'uptime': 0,
+                    'last_activity': None,
+                    'memory_mb': 0
+                }
+            
+            # Process-Infos holen
+            try:
+                proc = psutil.Process(pid)
+                
+                # Uptime berechnen (Sekunden seit Process-Start)
+                create_time = proc.create_time()
+                uptime_seconds = int(time.time() - create_time)
+                
+                # Memory Usage
+                memory_mb = round(proc.memory_info().rss / (1024 * 1024), 2)
+                
+                # Last Activity aus bot.log lesen (letzter "LOOP #" Eintrag)
+                last_activity = self._get_last_activity_from_log()
+                
+                return {
+                    'running': True,
+                    'pid': pid,
+                    'uptime': uptime_seconds,
+                    'uptime_formatted': self._format_uptime(uptime_seconds),
+                    'last_activity': last_activity,
+                    'memory_mb': memory_mb
+                }
+                
+            except psutil.NoSuchProcess:
+                # PID existiert nicht mehr
+                return {
+                    'running': False,
+                    'pid': None,
+                    'uptime': 0,
+                    'last_activity': None,
+                    'memory_mb': 0
+                }
+                
+        except Exception as e:
+            return {
+                'running': False,
+                'error': str(e)
+            }
+    
+    def _get_last_activity_from_log(self) -> Optional[str]:
+        """
+        Liest letzten LOOP-Timestamp aus bot.log
+        
+        Returns:
+            ISO-Timestamp oder None
+        """
+        try:
+            log_file = BASE_DIR / 'bot.log'
+            if not log_file.exists():
+                return None
+            
+            # Lese letzte 100 Zeilen rückwärts
+            with open(log_file, 'r') as f:
+                lines = f.readlines()[-100:]
+            
+            # Suche nach "LOOP #" Pattern von hinten
+            for line in reversed(lines):
+                if 'LOOP #' in line or 'Trade-Scan' in line:
+                    # Extrahiere Timestamp (Format: 2024-01-15 14:30:45)
+                    match = re.search(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+                    if match:
+                        return match.group(1)
+            
+            return None
+            
+        except Exception as e:
+            return None
+    
+    def _format_uptime(self, seconds: int) -> str:
+        """
+        Formatiert Uptime in lesbares Format
+        
+        Args:
+            seconds: Uptime in Sekunden
+            
+        Returns:
+            Formatierter String (z.B. "2h 35m")
+        """
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        
+        if hours > 0:
+            return f"{hours}h {minutes}m"
+        else:
+            return f"{minutes}m"
     
     def check_timer(self) -> Dict:
         """

@@ -200,19 +200,24 @@ def main():
                 raise
                 
             except Exception as e:
-                logger.error(f"Fehler im Main Loop: {e}", exc_info=True)
-                logger.info(f"Warte {config.SCOUT_INTERVAL} Sekunden und versuche erneut...")
-                time.sleep(config.SCOUT_INTERVAL)
+                logger.error(f"❌ Fehler im Main Loop: {e}", exc_info=True)
+                logger.warning(f"⚠️  Auto-Restart in 60 Sekunden...")
+                time.sleep(60)  # Warte 1 Minute vor Restart
+                logger.info("🔄 Restarting Loop...")
+                continue  # Fahre mit nächstem Loop fort
     
     except KeyboardInterrupt:
         logger.info("\n" + "="*70)
-        logger.info("🛑 BOT WURDE MANUELL GESTOPPT")
+        logger.info("🛑 BOT WURDE MANUELL GESTOPPT (KeyboardInterrupt)")
         logger.info("="*70)
         
     except Exception as e:
-        logger.critical(f"KRITISCHER FEHLER: {e}", exc_info=True)
-        logger.critical("Bot wird beendet")
-        sys.exit(1)
+        logger.critical(f"💥 KRITISCHER FEHLER im Main: {e}", exc_info=True)
+        logger.critical("⚠️  Bot wird in 5 Minuten neu gestartet...")
+        time.sleep(300)  # Warte 5 Minuten
+        logger.info("🔄 RESTARTING BOT...")
+        # Rekursiver Restart (ruft main() erneut auf)
+        main()
     
     finally:
         # Cleanup

@@ -174,6 +174,33 @@ def api_stats():
     return jsonify(stats)
 
 
+@app.route('/api/positions')
+@login_required
+def api_positions():
+    """
+    Aktuelle offene Positionen
+    """
+    try:
+        # Import trade_manager direkt (ist bereits in data_reader importiert)
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from modules.trade_manager import trade_manager
+        
+        positions = trade_manager.load_positions()
+        
+        return jsonify({
+            'positions': positions,
+            'total': len(positions)
+        })
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'positions': [],
+            'total': 0
+        }), 500
+
+
 # ============================================================================
 # API ENDPOINTS: BOT CONTROL (2-stufige Auth!)
 # ============================================================================
@@ -182,15 +209,19 @@ def api_stats():
 @login_required
 def api_bot_status():
     """
-    Bot-Status (läuft/gestoppt, PID, Timer)
+    Bot-Status mit Live-Metriken (uptime, last_activity, memory)
     """
-    is_running = bot_controller.is_bot_running()
-    pid = bot_controller.get_bot_pid()
+    # Nutze erweiterte get_bot_status() Methode
+    status = bot_controller.get_bot_status()
     timer_status = bot_controller.check_timer()
     
     return jsonify({
-        'is_running': is_running,
-        'pid': pid,
+        'is_running': status['running'],
+        'pid': status.get('pid'),
+        'uptime': status.get('uptime', 0),
+        'uptime_formatted': status.get('uptime_formatted', '0m'),
+        'last_activity': status.get('last_activity'),
+        'memory_mb': status.get('memory_mb', 0),
         'timer': timer_status
     })
 

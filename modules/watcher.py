@@ -10,6 +10,7 @@ from typing import Dict, Optional
 from datetime import datetime
 import config
 from modules.trader import Trader
+from modules.trade_manager import trade_manager
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +116,9 @@ class Watcher:
                         f"Change: {price_change_percent:+.2f}%"
                     )
                     
+                    # Update Position PnL in trade_manager
+                    trade_manager.update_position_pnl(token_address, current_price, price_change_percent)
+                    
                     # CHECK: Stop-Loss
                     if price_change_percent <= -self.stop_loss_percent:
                         logger.warning(
@@ -202,24 +206,43 @@ class Watcher:
             exit_result = self._execute_jupiter_sell(token_address, position['symbol'], token_balance)
             
             if exit_result:
-                # Berechne Profit/Loss
-                entry_value_usd = position['entry_price'] * token_balance
-                exit_value_usd = exit_price * token_balance
-                pnl_usd = exit_value_usd - entry_value_usd
+                # Berechne Profit/Loss in SOL
+                entry_sol = position.get('amount_sol', 0)
+                exit_sol = exit_result.get('amount_sol', 0)
+                pnl_sol = exit_sol - entry_sol
                 pnl_percent = ((exit_price - position['entry_price']) / position['entry_price']) * 100
                 
                 logger.info(
                     f"✅ EXIT ERFOLGREICH: {position['symbol']} | "
                     f"Reason: {reason} | "
-                    f"PnL: ${pnl_usd:.2f} ({pnl_percent:+.2f}%) | "
+                    f"PnL: {pnl_sol:.6f} SOL ({pnl_percent:+.2f}%) | "
                     f"Entry: ${position['entry_price']:.8f} | "
                     f"Exit: ${exit_price:.8f}"
                 )
                 
+                # Speichere Exit-Trade in trade_manager
+                trade_manager.save_trade({
+                    'type': 'SELL',
+                    'status': 'SUCCESS',
+                    'token_address': token_address,
+                    'symbol': position['symbol'],
+                    'signature': exit_result.get('signature'),
+                    'amount_sol': exit_sol,
+                    'amount_tokens': token_balance,
+                    'exit_price': exit_price,
+                    'profit_sol': pnl_sol,
+                    'profit_percent': pnl_percent,
+                    'exit_reason': reason
+                })
+                
+                # Entferne Position aus trade_manager
+                trade_manager.remove_position(token_address)
+                
+                # Update lokale Position
                 position['exit_price'] = exit_price
                 position['exit_time'] = datetime.now()
                 position['exit_reason'] = reason
-                position['pnl_usd'] = pnl_usd
+                position['pnl_sol'] = pnl_sol
                 position['pnl_percent'] = pnl_percent
                 position['status'] = 'closed'
                 position['exit_signature'] = exit_result.get('signature')
@@ -229,6 +252,16 @@ class Watcher:
                 
             else:
                 logger.error(f"❌ EXIT FEHLGESCHLAGEN für {position['symbol']}")
+                
+                # Speichere fehlgeschlagenen Exit
+                trade_manager.save_trade({
+                    'type': 'SELL',
+                    'status': 'FAILED',
+                    'token_address': token_address,
+                    'symbol': position['symbol'],
+                    'error_message': 'Jupiter Sell Failed',
+                    'exit_reason': reason
+                })
                 
         except Exception as e:
             logger.error(f"Fehler beim Exit Execution: {e}", exc_info=True)

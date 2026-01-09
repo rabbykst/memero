@@ -17,6 +17,11 @@ from typing import List, Dict, Optional
 import requests
 import psutil
 import pytz
+import sys
+
+# Füge Parent-Directory zum Path hinzu für trade_manager Import
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from modules.trade_manager import trade_manager
 
 from monitoring.config import (
     BOT_LOG_FILE,
@@ -171,8 +176,7 @@ class DataReader:
     
     def get_trades(self, limit: int = 50) -> List[Dict]:
         """
-        Liest Trade-Historie aus trades.json (falls vorhanden)
-        oder parst Trades aus Logs
+        Liest Trade-Historie aus trades.json via trade_manager
         
         Args:
             limit: Max Anzahl Trades
@@ -181,40 +185,9 @@ class DataReader:
             List von Trade-Objekten
         """
         try:
-            # Option 1: Aus JSON-Datei lesen (falls Bot Trades persistiert)
-            if TRADES_DB_FILE.exists():
-                with open(TRADES_DB_FILE, 'r') as f:
-                    trades = json.load(f)
-                    return trades[-limit:]
-            
-            # Option 2: Aus Logs parsen
-            # Suche nach "TRADE EXECUTION" und "TRADE SUCCESS" Pattern
-            logs = self.get_logs(lines=500)
-            trades = []
-            
-            for log in logs:
-                if 'TRADE EXECUTION START' in log['message']:
-                    # Extrahiere Token-Address aus Log
-                    match = re.search(r'TRADE EXECUTION START: (\w+) \(([A-Za-z0-9]+)\)', log['message'])
-                    if match:
-                        symbol, address = match.groups()
-                        trades.append({
-                            'timestamp': log['timestamp'],
-                            'symbol': symbol,
-                            'address': address,
-                            'type': 'BUY',
-                            'status': 'pending'
-                        })
-                
-                if 'TRADE SUCCESS' in log['message'] or 'Trade erfolgreich' in log['message']:
-                    if trades:
-                        trades[-1]['status'] = 'success'
-                
-                if 'TRADE FEHLGESCHLAGEN' in log['message']:
-                    if trades:
-                        trades[-1]['status'] = 'failed'
-            
-            return trades[-limit:]
+            # Lade Trades aus trade_manager (nutzt trades.json)
+            all_trades = trade_manager.load_trades()
+            return all_trades[-limit:] if all_trades else []
             
         except Exception as e:
             return [{'error': f'Fehler beim Trade-Lesen: {e}'}]
@@ -225,76 +198,50 @@ class DataReader:
     
     def get_statistics(self) -> Dict:
         """
-        Berechnet Performance-Statistiken aus Trade-Daten
+        Berechnet Performance-Statistiken aus echten Trade-Daten via trade_manager
         
         Returns:
             Dict mit total_trades, win_rate, total_pnl, avg_profit, etc.
         """
         try:
-            trades = self.get_trades(limit=1000)
+            # Nutze trade_manager für echte Performance-Daten
+            stats = trade_manager.get_trade_stats()
+            all_trades = trade_manager.load_trades()
             
-            if not trades or 'error' in trades[0]:
-                return {
-                    'total_trades': 0,
-                    'successful_trades': 0,
-                    'failed_trades': 0,
-                    'loss_trades': 0,
-                    'win_rate': 0,
-                    'total_pnl': 0,
-                    'avg_profit': 0,
-                    'best_trade': 0,
-                    'worst_trade': 0,
-                    'today_pnl': 0
-                }
+            # Berechne zusätzliche Metriken
+            completed_trades = [
+                t for t in all_trades 
+                if t.get('type') == 'SELL' and t.get('status') == 'SUCCESS'
+            ]
             
-            # Kategorisiere Trades
-            successful_trades = []  # Gewinn
-            loss_trades = []        # Verlust
-            failed_trades = []      # Technisch fehlgeschlagen
+            # Best/Worst Trade aus profit_percent
+            profits = [t.get('profit_percent', 0) for t in completed_trades]
+            best_trade = max(profits) if profits else 0
+            worst_trade = min(profits) if profits else 0
             
-            for t in trades:
-                if t.get('status') == 'failed':
-                    failed_trades.append(t)
-                elif t.get('status') == 'success':
-                    # Hier müsste man PnL aus Trade-Details lesen
-                    # Für jetzt: success = Gewinn angenommen
-                    successful_trades.append(t)
-                elif t.get('status') == 'loss':
-                    loss_trades.append(t)
+            # Durchschnitt nur von completed trades
+            avg_profit = (stats['total_profit_sol'] / len(completed_trades)) if completed_trades else 0
             
-            total_trades = len(successful_trades) + len(loss_trades) + len(failed_trades)
-            
-            # Win-Rate: nur erfolgreiche Trades vs. erfolgreiche + Verlust (failed nicht mitgezählt)
-            tradeable = len(successful_trades) + len(loss_trades)
-            win_rate = (len(successful_trades) / tradeable * 100) if tradeable > 0 else 0
-            
-            # Placeholder PnL (echte Werte müssten aus Trade-Details kommen)
-            total_pnl = len(successful_trades) * 0.005 - len(loss_trades) * 0.003
-            avg_profit = total_pnl / tradeable if tradeable > 0 else 0
-            
-            # Heutige Trades
+            # Heute's PnL (Filter nach Datum)
             today = datetime.now(self.timezone).date()
-            today_successful = [
-                t for t in successful_trades 
+            today_trades = [
+                t for t in completed_trades
                 if t.get('timestamp', '').startswith(str(today))
             ]
-            today_loss = [
-                t for t in loss_trades
-                if t.get('timestamp', '').startswith(str(today))
-            ]
-            today_pnl = len(today_successful) * 0.005 - len(today_loss) * 0.003
+            today_pnl = sum(t.get('profit_sol', 0) for t in today_trades)
             
             return {
-                'total_trades': total_trades,
-                'successful_trades': len(successful_trades),
-                'loss_trades': len(loss_trades),
-                'failed_trades': len(failed_trades),
-                'win_rate': round(win_rate, 2),
-                'total_pnl': round(total_pnl, 6),
+                'total_trades': stats['total_trades'],
+                'successful_trades': stats['successful_trades'],
+                'loss_trades': stats['losses'],
+                'failed_trades': stats['failed_trades'],
+                'win_rate': round(stats['win_rate'], 2),
+                'total_pnl': round(stats['total_profit_sol'], 6),
                 'avg_profit': round(avg_profit, 6),
                 'today_pnl': round(today_pnl, 6),
-                'best_trade': 0.015,  # TODO: Aus echten Daten
-                'worst_trade': -0.008  # TODO: Aus echten Daten
+                'best_trade': round(best_trade, 2),
+                'worst_trade': round(worst_trade, 2),
+                'wins': stats['wins']  # Für Win/Loss/Failed Chart
             }
             
         except Exception as e:
