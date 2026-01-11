@@ -152,6 +152,9 @@ async function loadStats() {
         // Update Charts
         updateCharts(stats);
         
+        // Update Performance Chart mit Trade-Historie
+        await updatePerformanceChart();
+        
     } catch (error) {
         console.error('Fehler beim Laden der Statistiken:', error);
     }
@@ -371,6 +374,81 @@ function updateCharts(stats) {
             stats.failed_trades || 0    // Technisch fehlgeschlagen
         ];
         winlossChart.update();
+    }
+}
+
+async function updatePerformanceChart() {
+    /**
+     * Lädt Trade-Historie und berechnet kumulativen PnL für Performance-Chart
+     */
+    try {
+        const response = await fetch('/api/trades?limit=100');
+        const tradesData = await response.json();
+        
+        if (!tradesData.trades || tradesData.trades.length === 0) {
+            // Keine Trades - zeige leeren Chart
+            if (performanceChart) {
+                performanceChart.data.labels = ['Start'];
+                performanceChart.data.datasets[0].data = [0];
+                performanceChart.update();
+            }
+            return;
+        }
+        
+        // Filtere nur SELL-Trades (haben profit_sol)
+        const sellTrades = tradesData.trades.filter(t => 
+            t.type === 'SELL' && t.status === 'SUCCESS' && t.profit_sol !== undefined
+        );
+        
+        if (sellTrades.length === 0) {
+            // Noch keine abgeschlossenen Trades
+            if (performanceChart) {
+                performanceChart.data.labels = ['Start'];
+                performanceChart.data.datasets[0].data = [0];
+                performanceChart.update();
+            }
+            return;
+        }
+        
+        // Sortiere nach Timestamp (älteste zuerst)
+        sellTrades.sort((a, b) => {
+            const timeA = new Date(a.timestamp).getTime();
+            const timeB = new Date(b.timestamp).getTime();
+            return timeA - timeB;
+        });
+        
+        // Berechne kumulativen PnL
+        const chartLabels = ['Start'];
+        const chartData = [0];
+        let cumulativePnL = 0;
+        
+        sellTrades.forEach((trade, index) => {
+            cumulativePnL += trade.profit_sol || 0;
+            
+            // Label: Trade # oder Datum
+            const tradeDate = new Date(trade.timestamp);
+            const label = `${tradeDate.getDate()}.${tradeDate.getMonth() + 1}`;
+            
+            chartLabels.push(label);
+            chartData.push(cumulativePnL);
+        });
+        
+        // Limitiere auf letzte 20 Datenpunkte für bessere Lesbarkeit
+        const maxPoints = 20;
+        const startIndex = Math.max(0, chartLabels.length - maxPoints);
+        const limitedLabels = chartLabels.slice(startIndex);
+        const limitedData = chartData.slice(startIndex);
+        
+        // Update Chart
+        if (performanceChart) {
+            performanceChart.data.labels = limitedLabels;
+            performanceChart.data.datasets[0].data = limitedData;
+            performanceChart.data.datasets[0].label = `Kumulativer PnL (${sellTrades.length} Trades)`;
+            performanceChart.update();
+        }
+        
+    } catch (error) {
+        console.error('Fehler beim Aktualisieren des Performance-Charts:', error);
     }
 }
 
