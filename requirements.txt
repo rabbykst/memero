@@ -1,6 +1,6 @@
 # Core Dependencies
 python-dotenv==1.0.0
-requests==2.31.0
+requests==2.32.4
 pytz==2024.1
 certifi==2024.12.14
 
@@ -18,5 +18,5 @@ python-dateutil==2.8.2
 
 # Monitoring Dashboard Dependencies
 flask==3.0.0
-werkzeug==3.0.1
+werkzeug==3.1.6
 psutil==5.9.6
